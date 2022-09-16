@@ -1,13 +1,13 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Telegram.Bot.Bot where
@@ -17,6 +17,9 @@ import App.Config (AppCtx (..))
 import App.ReplyM (dieIf, dieOnLeft, dieOnNothing)
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException, handle)
+-- import Telegram.Bot.Auth (checkAuth)
+
+import Control.Exception hiding (Handler)
 import Control.Monad.Except
   ( MonadError (throwError)
   )
@@ -36,10 +39,12 @@ import qualified Data.Text as T
 import Data.Time (getCurrentTime)
 import Database.PostgreSQL.Simple (Connection)
 import qualified Database.Types as DB
+import GHC.Base (undefined)
 import Logging.Logger (logGeneric)
 import Logging.Types (HasLogger (logError, logInfo))
 import Network.Wai.Handler.Warp
 import Servant
+import Servant (Context (EmptyContext))
 import Servant.Auth.Server
 import Servant.Server
 import Streaming
@@ -64,7 +69,6 @@ import Telegram.Bot.Api.Types
   , User (userId)
   , getEntity
   )
--- import Telegram.Bot.Auth (checkAuth)
 import Telegram.Monad
   ( TelegramAction (..)
   , TelegramActionSimple
@@ -75,10 +79,7 @@ import Telegram.Monad
   , runTelegramM
   )
 import Text.InterpolatedString.QM (qms)
-import Servant (Context(EmptyContext))
 
-import Control.Exception
-import GHC.Base (undefined)
 type Effects m =
   ( MonadReader (AppCtx Connection) m
   , MonadIO m
@@ -93,22 +94,28 @@ type WebhookAPI = "webhook" :> ReqBody '[JSON] Update :> Post '[JSON] ()
 webhookAPI :: Proxy WebhookAPI
 webhookAPI = Proxy
 
-server :: Effects m => ServerT WebhookAPI (AppM Connection ServerError m)
+server :: Update -> AppM Connection ServerError Handler ()
 server = processUpdate
 
-processUpdate :: Effects m => Update ->  m ()
-processUpdate (Update uid msg iq cbk) = do
-  -- ctx@AppCtx {..} <- ask
-  liftIO $ logInfo "ciaoo"
-  -- void $ throwError  err500
+processUpdate
+  :: ( MonadReader (AppCtx a) m
+     , HasLogger m
+     , MonadError ServerError m
+     )
+  => Update
+  -> m ()
+processUpdate (Update _uid _msg _iq _cbk) = do
+  AppCtx {} <- ask
+  logInfo "ciaoo"
+  void $ throwError err500
 
 startBot :: AppCtx Connection -> IO ()
 startBot ctx@AppCtx {..} = do
   logGeneric logger "INFO" config "Starting telegram bot"
   run 9090 $ serve webhookAPI $ hoistServer webhookAPI (r ctx) server
-   where
-     r c x = do
-       e <- runExceptT $ runReaderT (runAppM x) c
-       case e of
-         Left _ -> throwError err500
-         Right x -> pure x
+  where
+    r c x = do
+      e <- runExceptT $ runReaderT (runAppM x) c
+      case e of
+        Left _ -> throwError err500
+        Right q -> pure q
