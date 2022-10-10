@@ -70,8 +70,6 @@ library
     , postgresql-simple
     , qm-interpolated-string
     , random
-    , servant-auth-server
-    , servant-server
     , streaming
     , text
     , text-show
