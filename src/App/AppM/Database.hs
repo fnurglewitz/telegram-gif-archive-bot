@@ -41,6 +41,7 @@ import Database.Types
   , DB (..)
   , SavedGif(..) 
   )
+import Database.PostgreSQL.Simple.Types (PGArray(PGArray))
 
 getConnection :: DatabaseConfig -> IO Connection
 getConnection DatabaseConfig {..} = connect $ ConnectInfo (T.unpack pgHost) 5432 (T.unpack pgUser) (T.unpack pgPass) (T.unpack pgDb)
@@ -52,23 +53,23 @@ instance (MonadIO m) => DB (AppM Connection e m) where
       liftIO $
         execute
           conn
-          [sql|INSERT INTO public.auth (user_id, request_ts, enabled, max_price_checks, max_track_requests, username) VALUES (?, ?, ?, ?, ?, ?)|]
+          [sql|INSERT INTO public.auth (user_id, request_ts, enabled, username) VALUES (?, ?, ?, ?)|]
           (aUserId, aRequestTs, aEnabled, aUsername)
 
   getAuth uid = do
     conn <- asks db
-    r <- liftIO $ query conn "select user_id, request_ts, enabled, max_price_checks, max_track_requests, username from public.auth where user_id = ? limit 1" [uid]
+    r <- liftIO $ query conn "select user_id, request_ts, enabled, username from public.auth where user_id = ? limit 1" [uid]
     return $ listToMaybe r
 
-  saveGif gid _ = do
+  saveGif gid tags = do
     conn <- asks db
     void $
         liftIO $
           execute
             conn
-            [sql|INSERT INTO public.gif (id) VALUES(?)|]
-            [gid]
+            [sql|INSERT INTO public.gif (id, tags) VALUES(?, ?) on conflict (id) do update set tags = ?|]
+            (gid, PGArray tags, PGArray tags)
 
   findGifsByTags tags = do
     conn <- asks db
-    liftIO $ query conn "select id from public.gif where id = ?" tags
+    liftIO $ query conn "select id, tags from public.gif where tags && ?" [PGArray tags]

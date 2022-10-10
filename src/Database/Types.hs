@@ -18,9 +18,8 @@ data Auth = Auth
   deriving (Generic, FromRow, ToRow, Show)
 
 data SavedGif = SavedGif
-  { gifId :: Integer
+  { gifId :: Text
   , gifTags :: PGArray Text
-  , gifCreatedAt :: UTCTime
   }
   deriving (Generic, FromRow, ToRow, Show)
 

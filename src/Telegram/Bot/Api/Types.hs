@@ -85,6 +85,21 @@ instance ToJSON InlineQuery where
   toJSON InlineQuery {..} =
     object $ Prelude.filter ((/= Null) . snd) ["id" .= iqId, "from" .= iqFrom, "query" .= iqQuery, "offset" .= iqOffset, "chat_type" .= iqChatType]
 
+data AnswerInlineQueryRequest = AnswerInlineQueryRequest
+  { aiqInlineQueryId :: Text
+  , aiqResults :: [InlineQueryResult]
+  }
+  deriving (Eq,Show,Generic)
+
+data InlineQueryResult =
+    CachedMpeg4Gif Text Text
+  | CachedGif Text Text
+  deriving (Eq, Show, Generic)
+
+instance ToJSON InlineQueryResult where
+  toJSON (CachedGif iqId fileId) = object $ Prelude.filter ((/= Null) . snd) ["type" .= ("mpeg4_gif" :: Text), "id" .= iqId, "mpeg4_file_id" .= fileId]
+  toJSON (CachedMpeg4Gif iqId fileId)  = object $ Prelude.filter ((/= Null) . snd) ["type" .= ("gif" :: Text), "id" .= iqId, "gif_file_id" .= fileId]
+
 data CallbackQuery = CallbackQuery
   { cbkId :: Text
   , cbkFrom :: User
@@ -110,7 +125,9 @@ data Message = Message
   , from :: Maybe User
   , date :: Integer
   , chat :: Chat
+  , replyToMessage :: Maybe Message
   , text :: Maybe Text
+  , animation :: Maybe Animation
   , entities :: Maybe [MessageEntity]
   , replyMarkup :: Maybe InlineKeyboardMarkup
   }
@@ -123,13 +140,37 @@ instance FromJSON Message where
       <*> v .:? "from"
       <*> v .: "date"
       <*> v .: "chat"
+      <*> v .:? "reply_to_message"
       <*> v .:? "text"
+      <*> v .:? "animation"
       <*> v .:? "entities"
       <*> v .:? "reply_markup"
 
 instance ToJSON Message where
   toJSON Message {..} =
-    object $ Prelude.filter ((/= Null) . snd) ["message_id" .= messageId, "from" .= from, "date" .= date, "chat" .= chat, "text" .= text, "entities" .= entities, "reply_markup" .= replyMarkup]
+    object $ Prelude.filter ((/= Null) . snd) ["message_id" .= messageId, "from" .= from, "date" .= date, "chat" .= chat, "reply_to_message" .= replyToMessage, "text" .= text, "animation" .= animation, "entities" .= entities, "reply_markup" .= replyMarkup]
+
+data Animation = Animation
+  { animationId :: Text
+  , animationUniqueId :: Text
+  , animationWidth :: Integer
+  , animationHeight :: Integer
+  , animationDuration :: Integer
+  } 
+  deriving (Eq, Show, Generic)
+
+instance FromJSON Animation where
+  parseJSON = withObject "Animation" $ \v ->
+    Animation
+      <$> v .: "file_id"
+      <*> v .: "file_unique_id"
+      <*> v .: "width"
+      <*> v .: "height"
+      <*> v .: "duration"
+
+instance ToJSON Animation where
+  toJSON Animation {..} =
+    object $ Prelude.filter ((/= Null) . snd) ["file_id" .= animationId, "file_unique_id" .= animationUniqueId, "width" .= animationWidth, "height" .= animationHeight, "duration" .= animationDuration]
 
 data MessageEntity = MessageEntity
   { eType :: Text
@@ -257,7 +298,7 @@ instance ToJSON InlineKeyboardButton where
     object $ Prelude.filter ((/= Null) . snd) ["text" .= txt, "url" .= url, "callback_data" .= dat]
 
 getEntity :: Text -> Message -> Maybe Text
-getEntity entityType (Message _ _ _ _ (Just txt) (Just entities) _) = do
+getEntity entityType (Message _ _ _ _ _ (Just txt) _ (Just entities) _) = do
   MessageEntity {..} <- find (\MessageEntity {..} -> eType == entityType) entities
   let substr o l t = T.take l $ T.drop o t
       entityTxt = substr (fromInteger eOffset) (fromInteger eLength) txt
@@ -265,7 +306,7 @@ getEntity entityType (Message _ _ _ _ (Just txt) (Just entities) _) = do
 getEntity _ _ = Nothing
 
 getEntities :: Text -> Message -> [Text]
-getEntities entityType (Message _ _ _ _ (Just txt) (Just entities) _) = do
+getEntities entityType (Message _ _ _ _ _ (Just txt) _ (Just entities) _) = do
   let substr o l t = T.take l $ T.drop o t
       entityTxt MessageEntity {..} = substr (fromInteger eOffset) (fromInteger eLength) txt
   entityTxt <$> filter (\MessageEntity {..} -> eType == entityType) entities
