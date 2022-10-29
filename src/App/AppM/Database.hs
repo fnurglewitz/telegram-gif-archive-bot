@@ -17,6 +17,7 @@ import Data.Maybe (listToMaybe)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Time (getCurrentTime)
+import Data.UUID.V4 (nextRandom)
 import Database.PostgreSQL.Simple
   ( ConnectInfo (..)
   , Connection
@@ -63,13 +64,14 @@ instance (MonadIO m) => DB (AppM Connection e m) where
 
   saveGif gid tags = do
     conn <- asks db
+    uuid <- liftIO nextRandom
     void $
         liftIO $
           execute
             conn
-            [sql|INSERT INTO public.gif (id, tags) VALUES(?, ?) on conflict (id) do update set tags = ?|]
-            (gid, PGArray tags, PGArray tags)
+            [sql|INSERT INTO public.gif (gif_id, tags, uuid) VALUES(?, ?, ?) on conflict (gif_id) do update set tags = ?|]
+            (gid, PGArray tags, uuid, PGArray tags)
 
   findGifsByTags tags = do
     conn <- asks db
-    liftIO $ query conn "select id, tags from public.gif where tags && ?" [PGArray tags]
+    liftIO $ query conn "select gif_id, tags, uuid from public.gif where tags && ?" [PGArray tags]

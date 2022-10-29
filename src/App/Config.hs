@@ -127,7 +127,7 @@ dbParser =
       ( long "pg-db"
           <> metavar "PGDB"
           <> showDefault
-          <> value "pod"
+          <> value "gifbot"
           <> help "Postgres database name"
       )
 

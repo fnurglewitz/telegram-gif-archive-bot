@@ -29,6 +29,7 @@ import Control.Monad.Trans.Except (runExceptT)
 import Control.Monad.Trans.Maybe (MaybeT (..))
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.UUID (toText)
 import Database.PostgreSQL.Simple (Connection)
 import qualified Database.Types as DB
 import Logging.Logger (logGeneric)
@@ -118,7 +119,7 @@ startBot ctx@AppCtx {..} = do
       case r of
         Left err -> logGeneric logger "ERROR" config err
         Right x -> pure x
-      threadDelay 10000
+      threadDelay 1000
 
 handleMessage :: Effects m => Message -> m ()
 handleMessage m@Message {..} = void $ runMaybeT do
@@ -159,5 +160,5 @@ handleInlineQuery iq@InlineQuery{..} = runTelegramM executeBotAction $ do
   pure $ NoKeyboard $ AnswerInlineQuery iqId $ convert <$> gifs 
   where
     check txt = T.take 1 txt == "#"
-    convert DB.SavedGif{..} = CachedMpeg4Gif (T.take 64 gifId) gifId
+    convert DB.SavedGif{..} = CachedMpeg4Gif (toText gifUUID) gifId
 

@@ -5,6 +5,7 @@ module Database.Types where
 
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import Data.UUID (UUID)
 import Database.PostgreSQL.Simple (FromRow, ToRow)
 import Database.PostgreSQL.Simple.Types (PGArray(..))
 import GHC.Generics (Generic)
@@ -20,6 +21,7 @@ data Auth = Auth
 data SavedGif = SavedGif
   { gifId :: Text
   , gifTags :: PGArray Text
+  , gifUUID :: UUID
   }
   deriving (Generic, FromRow, ToRow, Show)
 
